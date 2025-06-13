@@ -88,6 +88,45 @@ server.tool(
   }
 );
 
+// Register the lesson details
+server.tool(
+  "vip-learn-lesson-details",
+  {
+    query: z.string().min(1).describe("Lesson details by slug"),
+  },
+  async ({ query }) => {
+    const url = `${vipLearnConfig.siteUrl}/wp-json/vip-learn/v1/lesson-details`;
+    const agent = new https.Agent({ rejectUnauthorized: false });
+    try {
+      const response = await axios.get(url, {
+        params: { slug: query },
+        auth: {
+          username: vipLearnConfig.username,
+          password: vipLearnConfig.password,
+        },
+        httpsAgent: agent,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
