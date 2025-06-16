@@ -32,19 +32,49 @@ const server = new McpServer({
   },
 });
 
+const logFilePath = path.resolve(__dirname, '../mcp-status.log');
+function logStatus(message: string) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  fs.appendFileSync(logFilePath, logMessage);
+  console.log(message);
+}
+
 // Register a simple status tool
 server.tool(
   "vip-learn-mcp-status",
-  "Get the status of the VIP Learn MCP server",
+  "Get the status of the VIP Learn MCP server and check the remote VIP Learn API status.",
   {},
   async () => {
+    let remoteStatus = "Unknown";
+    let remoteHealthy = false;
+    try {
+      const url = `${vipLearnConfig.siteUrl}/wp-json/vip-learn/v1/status`;
+      const agent = new https.Agent({ rejectUnauthorized: false });
+      const response = await axios.get(url, {
+        auth: {
+          username: vipLearnConfig.username,
+          password: vipLearnConfig.password,
+        },
+        httpsAgent: agent,
+      });
+      if (response.status === 200 && typeof response.data === 'string' && response.data.trim() === 'OK') {
+        remoteStatus = "Remote VIP Learn API is healthy (200 OK, response: 'OK').";
+        remoteHealthy = true;
+      } else {
+        remoteStatus = `Remote VIP Learn API returned status ${response.status} and response: ${JSON.stringify(response.data)}`;
+      }
+    } catch (error: any) {
+      remoteStatus = `Error checking remote VIP Learn API: ${error.message}`;
+    }
     return {
       content: [
         {
           type: "text",
-          text: "I am working",
+          text: `I am working.\n${remoteStatus}`,
         },
       ],
+      healthy: remoteHealthy,
     };
   }
 );
@@ -126,7 +156,7 @@ apiTools.forEach(registerApiTool);
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("VIP Learn MCP Server running on stdio");
+  console.log("VIP Learn MCP Server running on stdio");
 }
 
 main().catch((error) => {
