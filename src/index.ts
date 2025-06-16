@@ -45,87 +45,83 @@ server.tool(
           text: "I am working",
         },
       ],
-    }
+    };
   }
 );
 
-// Register the lesson search tool
-server.tool(
-  "vip-learn-lesson-search",
-  {
-    query: z.string().min(1).describe("Search term for lessons"),
-  },
-  async ({ query }) => {
-    const url = `${vipLearnConfig.siteUrl}/wp-json/vip-learn/v1/lesson-search`;
-    const agent = new https.Agent({ rejectUnauthorized: false });
-    try {
-      const response = await axios.get(url, {
-        params: { s: query },
-        auth: {
-          username: vipLearnConfig.username,
-          password: vipLearnConfig.password,
-        },
-        httpsAgent: agent,
-      });
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(response.data, null, 2),
-          },
-        ],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: ${error.message}`,
-          },
-        ],
-      };
-    }
-  }
-);
+// Helper function to register similar tools
 
-// Register the lesson details
-server.tool(
-  "vip-learn-lesson-details",
-  {
-    query: z.string().min(1).describe("Lesson details by slug"),
-  },
-  async ({ query }) => {
-    const url = `${vipLearnConfig.siteUrl}/wp-json/vip-learn/v1/lesson-details`;
-    const agent = new https.Agent({ rejectUnauthorized: false });
-    try {
-      const response = await axios.get(url, {
-        params: { slug: query },
-        auth: {
-          username: vipLearnConfig.username,
-          password: vipLearnConfig.password,
-        },
-        httpsAgent: agent,
-      });
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(response.data, null, 2),
+type ApiToolConfig = {
+  name: string;
+  description: string;
+  paramName: string;
+  paramDescription: string;
+  endpoint: string;
+  paramKey: string;
+};
+
+function registerApiTool({ name, description, paramName, paramDescription, endpoint, paramKey }: ApiToolConfig) {
+  server.tool(
+    name,
+    {
+      [paramName]: z.string().min(1).describe(paramDescription),
+    },
+    async (params) => {
+      const url = `${vipLearnConfig.siteUrl}${endpoint}`;
+      const agent = new https.Agent({ rejectUnauthorized: false });
+      try {
+        const response = await axios.get(url, {
+          params: { [paramKey]: params[paramName] },
+          auth: {
+            username: vipLearnConfig.username,
+            password: vipLearnConfig.password,
           },
-        ],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: ${error.message}`,
-          },
-        ],
-      };
+          httpsAgent: agent,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response.data, null, 2),
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: ${error.message}`,
+            },
+          ],
+        };
+      }
     }
-  }
-);
+  );
+}
+
+// Array of tool configs
+const apiTools = [
+  {
+    name: "vip-learn-lesson-search",
+    description: "Search for lessons by a query string.",
+    paramName: "query",
+    paramDescription: "Search term for lessons",
+    endpoint: "/wp-json/vip-learn/v1/lesson-search",
+    paramKey: "s",
+  },
+  {
+    name: "vip-learn-lesson-details",
+    description: "Fetch lesson details by lesson slug.",
+    paramName: "query",
+    paramDescription: "Lesson details by slug",
+    endpoint: "/wp-json/vip-learn/v1/lesson-details",
+    paramKey: "slug",
+  },
+];
+
+// Register all API tools
+apiTools.forEach(registerApiTool);
 
 async function main() {
   const transport = new StdioServerTransport();
